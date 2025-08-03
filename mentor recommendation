@@ -1,0 +1,138 @@
+📁 Directory Structure (Recommended)
+pgsql
+Copy
+Edit
+mentor_recommendation/
+├── agents/
+│   ├── orchestrator.py
+│   ├── profile_retrieval_agent.py
+│   └── generation_agent.py
+├── api/
+│   └── main.py
+├── db/
+│   ├── database.py
+│   └── models.py
+├── knowledge_graph/
+│   └── graph_handler.py
+├── langchain_module/
+│   ├── vectorstore.py
+│   └── rag_chain.py
+├── utils/
+│   └── schemas.py
+└── requirements.txt
+🧠 agents/orchestrator.py
+python
+Copy
+Edit
+from agents.profile_retrieval_agent import get_user_profile
+from agents.generation_agent import generate_mentor_response
+
+def orchestrate_recommendation(user_query: str):
+    profile = get_user_profile(user_query)
+    response = generate_mentor_response(user_query, profile)
+    return response
+👤 agents/profile_retrieval_agent.py
+python
+Copy
+Edit
+from knowledge_graph.graph_handler import get_profile_from_graph
+
+def get_user_profile(user_query: str):
+    # extract keywords or user ID from query
+    return get_profile_from_graph(user_query)
+🤖 agents/generation_agent.py
+python
+Copy
+Edit
+from langchain_module.rag_chain import run_rag_pipeline
+
+def generate_mentor_response(query: str, profile: dict):
+    context = " ".join(profile.get("skills", []))  # enrich query
+    return run_rag_pipeline(f"{query} | {context}")
+🗃️ knowledge_graph/graph_handler.py
+python
+Copy
+Edit
+from db.database import SessionLocal
+from db.models import Mentor
+
+def get_profile_from_graph(user_query: str):
+    db = SessionLocal()
+    mentor = db.query(Mentor).filter(Mentor.skills.ilike(f"%{user_query}%")).first()
+    return {"name": mentor.name, "skills": mentor.skills.split(",")}
+🧬 langchain_module/rag_chain.py
+python
+Copy
+Edit
+from langchain.chains import RetrievalQA
+from langchain.vectorstores import Pinecone
+from langchain.embeddings import OpenAIEmbeddings
+from langchain.llms import OpenAI
+
+import pinecone
+
+pinecone.init(api_key="your-key", environment="your-env")
+index = pinecone.Index("mentor-index")
+vectorstore = Pinecone(index, OpenAIEmbeddings(), "text")
+
+rag_chain = RetrievalQA.from_chain_type(
+    llm=OpenAI(),
+    chain_type="stuff",
+    retriever=vectorstore.as_retriever()
+)
+
+def run_rag_pipeline(query: str):
+    return rag_chain.run(query)
+🚀 api/main.py
+python
+Copy
+Edit
+from fastapi import FastAPI
+from pydantic import BaseModel
+from agents.orchestrator import orchestrate_recommendation
+
+app = FastAPI()
+
+class Query(BaseModel):
+    query: str
+
+@app.post("/recommend")
+def recommend_mentor(query: Query):
+    response = orchestrate_recommendation(query.query)
+    return {"recommendation": response}
+🧾 db/models.py
+python
+Copy
+Edit
+from sqlalchemy import Column, Integer, String
+from sqlalchemy.ext.declarative import declarative_base
+
+Base = declarative_base()
+
+class Mentor(Base):
+    __tablename__ = "mentors"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String)
+    skills = Column(String)
+🧬 db/database.py
+python
+Copy
+Edit
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
+SQLALCHEMY_DATABASE_URL = "postgresql://user:password@localhost/mentor_db"
+engine = create_engine(SQLALCHEMY_DATABASE_URL)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+📦 requirements.txt
+nginx
+Copy
+Edit
+fastapi
+uvicorn
+sqlalchemy
+psycopg2
+langchain
+openai
+pinecone-client
+pydantic
