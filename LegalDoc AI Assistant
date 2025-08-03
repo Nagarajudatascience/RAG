@@ -1,0 +1,160 @@
+
+descrption:
+
+An AI-powered assistant that uses LangChain, CrewAI agents, and RAG pipeline to answer questions from legal documents (PDFs, contracts, case law, etc.)
+
+✅ Use Case
+Upload legal documents
+
+Extract, chunk, and vectorize them
+
+Ask questions like "What is the penalty clause in this contract?"
+
+Multi-agent system answers with citations
+
+
+🔧 Tech Stack
+FastAPI – API framework
+
+CrewAI – Agent manager
+
+LangChain – RAG & Prompting
+
+ChromaDB / Pinecone – Vector storage
+
+Pydantic – Validation
+
+PyPDF / LangChain doc loaders – File parsing
+
+OpenAI / Claude – LLMs
+
+
+🧠 Agents Overview
+
+Agent	                       Role
+
+DocumentAgent	              Ingests, chunks, embeds uploaded files
+QueryAgent	               Receives user questions
+RetrieverAgent	           Uses vector DB to fetch relevant chunks
+AnswerAgent	               Uses RAG chain to compose final answer
+
+
+
+
+
+
+
+
+
+📁 Directory Structure
+css
+Copy
+Edit
+legal_doc_ai/
+├── agents/
+│   ├── document_agent.py
+│   ├── query_agent.py
+│   ├── retriever_agent.py
+│   └── answer_agent.py
+├── api/
+│   └── main.py
+├── vectorstore/
+│   ├── chromadb_handler.py
+│   └── chunking.py
+├── utils/
+│   └── pdf_loader.py
+└── requirements.txt
+🔍 Sample Code (Highlights Only)
+
+
+📄 agents/document_agent.py
+
+from utils.pdf_loader import load_pdf
+from vectorstore.chunking import chunk_texts, embed_and_store
+
+def handle_upload(file_path: str):
+    texts = load_pdf(file_path)
+    chunks = chunk_texts(texts)
+    embed_and_store(chunks)
+    return {"status": "indexed"}
+
+
+🧠 agents/query_agent.py
+
+from agents.retriever_agent import retrieve_context
+from agents.answer_agent import generate_answer
+
+def process_user_query(question: str):
+    context = retrieve_context(question)
+    return generate_answer(question, context)
+
+🧠 agents/retriever_agent.py
+
+from vectorstore.chromadb_handler import get_relevant_docs
+
+def retrieve_context(query: str):
+    return get_relevant_docs(query)
+
+🧠 agents/answer_agent.py
+
+from langchain.chains import RetrievalQA
+from langchain.llms import OpenAI
+
+def generate_answer(query: str, context: str):
+    prompt = f"Context: {context}\n\nQuestion: {query}"
+    llm = OpenAI(temperature=0)
+    return llm(prompt)
+
+📤 utils/pdf_loader.py
+
+from langchain.document_loaders import PyPDFLoader
+
+def load_pdf(file_path: str):
+    loader = PyPDFLoader(file_path)
+    return loader.load()
+
+🧠 vectorstore/chromadb_handler.py
+
+import chromadb
+from langchain.vectorstores import Chroma
+from langchain.embeddings import OpenAIEmbeddings
+
+def embed_and_store(chunks: list):
+    vectorstore = Chroma(persist_directory="./chroma", embedding_function=OpenAIEmbeddings())
+    vectorstore.add_texts(chunks)
+
+def get_relevant_docs(query: str):
+    vectorstore = Chroma(persist_directory="./chroma", embedding_function=OpenAIEmbeddings())
+    docs = vectorstore.similarity_search(query)
+    return " ".join([doc.page_content for doc in docs])
+
+🚀 API Entry: api/main.py
+
+from fastapi import FastAPI, UploadFile
+from agents.document_agent import handle_upload
+from agents.query_agent import process_user_query
+
+app = FastAPI()
+
+@app.post("/upload/")
+async def upload_doc(file: UploadFile):
+    with open(f"./{file.filename}", "wb") as f:
+        f.write(await file.read())
+    return handle_upload(f"./{file.filename}")
+
+@app.post("/ask/")
+async def ask_question(q: str):
+    return {"answer": process_user_query(q)}
+
+📦 requirements.txt
+nginx
+Copy
+Edit
+fastapi
+uvicorn
+langchain
+openai
+chromadb
+pydantic
+crewai
+PyPDF2
